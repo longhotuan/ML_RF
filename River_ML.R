@@ -10,6 +10,7 @@ library(grid)
 library(chron)
 library(devtools)
 library(SOfun)
+library(usethis)
 
 # data visualization 
 
@@ -331,6 +332,17 @@ river_dun_CH4_D <- as.data.frame(dunn.test(river$Dis_CH4_cor, river$Date, method
 river_dun_N2O_D <- as.data.frame(dunn.test(river$Dis_N2O_cor, river$Date, method=c('bonferroni'))[4:5])
 river_dun_D <- bind_rows(river_dun_CO2_D, river_dun_CH4_D, river_dun_N2O_D, .id = "Dissolved gases")
 write_csv(river_dun_D, "river_dun_D.csv")
+
+#*** Friedmann test ####
+
+# Different river, block date 
+
+
+
+
+# Different date, block river
+
+
 
 #### RF - TRY ####
 
