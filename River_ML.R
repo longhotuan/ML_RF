@@ -136,11 +136,11 @@ ggsave("Mosaic_river_pool.tiff",ggplot(river)+
 # log transform and data standardization 
 
 river_sta <- river
-river_sta$log_N2O <- log(river_sta$Dis_N2O_cor)
+river_sta$log_N2O <- log(river_sta$`Dissolved N2O`)
 river_sta$sta_N2O <- standardize(river_sta$log_N2O) 
-river_sta$log_CH4 <- log(river_sta$Dis_CH4_cor)
+river_sta$log_CH4 <- log(river_sta$`Dissolved CH4`)
 river_sta$sta_CH4 <- standardize(river_sta$log_CH4) 
-river_sta$log_CO2 <- log(river_sta$Dis_CO2_cor)
+river_sta$log_CO2 <- log(river_sta$`Dissolved CO2`)
 river_sta$sta_CO2 <- standardize(river_sta$log_CO2) 
 
 #***** N2O #####
@@ -174,6 +174,7 @@ river_lmm_N2O <- lmer(sta_N2O~1 + (1|River/Date), data = river_sta_N2O)
 r.squaredGLMM(river_lmm_N2O)
 summary(river_lmm_N2O)
 vcov(river_lmm_N2O)
+var_N2O <- as.data.frame(VarCorr(river_lmm_N2O))
 
 # using built-in function
 river_lmm_N2O_fort <- fortify(river_lmm_N2O)
@@ -206,12 +207,8 @@ ggsave("Diagnostic_plot3.tiff",diagPlts[[3]],
        units = 'cm', height = 20, width = 20, dpi = 300)
 
 # ICC values !!! river should be date and river
-ICC_river_N2O <- as.numeric(VarCorr(river_lmm2_N2O)[[2]])/
-    (as.numeric(VarCorr(river_lmm2_N2O)[[2]]) + as.numeric(VarCorr(river_lmm2_N2O)[[4]])+
-         as.numeric(VarCorr(river_lmm2_N2O)[[5]]))
-ICC_date_N2O <- (as.numeric(VarCorr(river_lmm2_N2O)[[2]])+ as.numeric(VarCorr(river_lmm2_N2O)[[4]]))/
-    (as.numeric(VarCorr(river_lmm2_N2O)[[2]]) + as.numeric(VarCorr(river_lmm2_N2O)[[4]])+
-         as.numeric(VarCorr(river_lmm2_N2O)[[5]]))
+ICC_date_N2O <- var_N2O$vcov[1]/sum(var_N2O$vcov)
+ICC_river_N2O <- (var_N2O$vcov[1] + var_N2O$vcov[2])/sum(var_N2O$vcov)
 
 # ICC river and date are low meaning low spatiotemporal variability
 
@@ -222,7 +219,8 @@ ICC_date_N2O <- (as.numeric(VarCorr(river_lmm2_N2O)[[2]])+ as.numeric(VarCorr(ri
 
 # using box plot 
 
-boxplot.stats(river_sta$sta_CH4)$out
+boxplot.stats(river_sta$sta_CH4)$out # no outlier
+
 
 # using cleveland dotplot
 
@@ -246,6 +244,7 @@ river_lmm_CH4 <- lmer(sta_CH4~1 + (1|River/Date), data = river_sta)
 r.squaredGLMM(river_lmm_CH4)
 summary(river_lmm_CH4)
 vcov(river_lmm_CH4)
+var_CH4 <- as.data.frame(VarCorr(river_lmm_CH4))
 
 # using built-in function
 river_lmm_CH4_fort <- fortify(river_lmm_CH4)
@@ -260,8 +259,8 @@ ggsave("Diagnostic_plot3.tiff",diagPlts[[3]],
        units = 'cm', height = 20, width = 20, dpi = 300)
 
 # ICC values 
-ICC_river_CH4 <- 0.2713/ (0.2713 + 0.2504 + 0.5999)
-ICC_date_CH4 <- (0.2713 + 0.2504)/ (0.2713 + 0.2504 + 0.5999)
+ICC_date_CH4 <- var_CH4$vcov[1]/sum(var_CH4$vcov)
+ICC_river_CH4 <- (var_CH4$vcov[1] + var_CH4$vcov[2])/sum(var_CH4$vcov)
 
 # ICC river and date are low meaning low spatiotemporal variability
 
@@ -274,13 +273,14 @@ ICC_date_CH4 <- (0.2713 + 0.2504)/ (0.2713 + 0.2504 + 0.5999)
 # using box plot 
 
 boxplot.stats(river_sta$sta_CO2)$out
+river_sta_CO2 <- river_sta %>% filter (sta_CO2 < 1.3)
 
 # using cleveland dotplot
 
-ggsave("Cleveland_CO2.tiff",ggplot(river_sta) +
+ggsave("Cleveland_CO2.tiff",ggplot(river_sta_CO2) +
            aes(x = sta_CO2, y = No) +
            geom_point(size = 3L, colour = "#0c4c8a") +
-           xlab(bquote("Standardized Dissolved "*CH[4]*"")) +
+           xlab(bquote("Standardized Dissolved "*CO[2]*"")) +
            ylab("Order of the data")+
            theme_bw()+
            theme(axis.title.y = element_text(size = 14),
@@ -297,7 +297,7 @@ river_lmm_CO2 <- lmer(sta_CO2~1 + (1|River/Date), data = river_sta)
 r.squaredGLMM(river_lmm_CO2)
 summary(river_lmm_CO2)
 vcov(river_lmm_CO2)
-
+var_CO2 <- as.data.frame(VarCorr(river_lmm_CO2))
 # using built-in function
 river_lmm_CO2_fort <- fortify(river_lmm_CO2)
 
@@ -311,8 +311,9 @@ ggsave("Diagnostic_plot3.tiff",diagPlts[[3]],
        units = 'cm', height = 20, width = 20, dpi = 300)
 
 # ICC values 
-ICC_river_CO2 <- 0.2155/ (0.2155 + 0.2635  + 0.6616 )
-ICC_date_CO2 <- (0.2155 + 0.2635 )/ (0.2155 + 0.2635  + 0.6616 )
+ICC_date_CO2 <- var_CO2$vcov[1]/sum(var_CO2$vcov)
+ICC_river_CO2 <- (var_CO2$vcov[1] + var_CO2$vcov[2])/sum(var_CO2$vcov)
+
 
 # ICC river and date are low meaning low spatiotemporal variability
 
@@ -335,14 +336,13 @@ write_csv(river_dun_D, "river_dun_D.csv")
 
 #*** Friedmann test ####
 
-# Different river, block date 
+river_fried <- river %>% select(c(2,5, 36:38))
+river_fried_1 <- aggregate(data = river_fried, .~Date + River, mean)
+river_fried_2 <- aggregate(list(river_fried[,3:5]), by = list(Date = river_fried$Date,
+                                                                  River = river_fried$River), FUN = mean)
 
-
-
-
-# Different date, block river
-
-
+# Different river, block date --> cannot because not an unreplicated complete block design
+friedman.test(river_fried_1$`Dissolved N2O`, river_fried_1$River, river_fried_1$Date)
 
 #### RF - TRY ####
 
