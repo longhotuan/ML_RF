@@ -322,16 +322,20 @@ ICC_river_CO2 <- (var_CO2$vcov[1] + var_CO2$vcov[2])/sum(var_CO2$vcov)
 
 #*** Kruskal-wallis with Bonferroni correction ####
 
-river_dun_CO2 <- as.data.frame(dunn.test(river$Dis_CO2_cor, river$River, method=c('bonferroni'))[4:5])
-river_dun_CH4 <- as.data.frame(dunn.test(river$Dis_CH4_cor, river$River, method=c('bonferroni'))[4:5])
-river_dun_N2O <- as.data.frame(dunn.test(river$Dis_N2O_cor, river$River, method=c('bonferroni'))[4:5])
+river_dun_CO2 <- as.data.frame(dunn.test(river$`Dissolved CO2`, river$River, method=c('bonferroni'))[4:5])
+river_dun_CH4 <- as.data.frame(dunn.test(river$`Dissolved CH4`, river$River, method=c('bonferroni'))[4:5])
+river_dun_N2O <- as.data.frame(dunn.test(river$`Dissolved N2O`, river$River, method=c('bonferroni'))[4:5])
 river_dun <- bind_rows(river_dun_CO2, river_dun_CH4, river_dun_N2O, .id = "Dissolved gases")
+river_dun$`Dissolved gases` <- factor(river_dun$`Dissolved gases`)
+levels(river_dun$`Dissolved gases`) <- c("Dissolved CO2", "Dissolved CH4", "Dissolved N2O")
 write_csv(river_dun, "river_dun.csv")
 
-river_dun_CO2_D <- as.data.frame(dunn.test(river$Dis_CO2_cor, river$Date, method=c('bonferroni'))[4:5])
-river_dun_CH4_D <- as.data.frame(dunn.test(river$Dis_CH4_cor, river$Date, method=c('bonferroni'))[4:5])
-river_dun_N2O_D <- as.data.frame(dunn.test(river$Dis_N2O_cor, river$Date, method=c('bonferroni'))[4:5])
+river_dun_CO2_D <- as.data.frame(dunn.test(river$`Dissolved CO2`, river$Date, method=c('bonferroni'))[4:5])
+river_dun_CH4_D <- as.data.frame(dunn.test(river$`Dissolved CH4`, river$Date, method=c('bonferroni'))[4:5])
+river_dun_N2O_D <- as.data.frame(dunn.test(river$`Dissolved N2O`, river$Date, method=c('bonferroni'))[4:5])
 river_dun_D <- bind_rows(river_dun_CO2_D, river_dun_CH4_D, river_dun_N2O_D, .id = "Dissolved gases")
+river_dun_D$`Dissolved gases` <- factor(river_dun_D$`Dissolved gases`)
+levels(river_dun_D$`Dissolved gases`) <- c("Dissolved CO2", "Dissolved CH4", "Dissolved N2O")
 write_csv(river_dun_D, "river_dun_D.csv")
 
 #*** Friedmann test ####
