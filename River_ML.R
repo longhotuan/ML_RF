@@ -54,6 +54,7 @@ library(checkmate)
 library(ranger)
 library(parallel)
 library(parallelMap)
+library(robustHD)
 
 
 #### import data ####
@@ -159,7 +160,7 @@ river_sta_N2O <- river_sta %>% filter (sta_N2O < 2.7)
 ggsave("Cleveland_N2O.tiff", ggplot(river_sta_N2O) +
     aes(x = sta_N2O, y = No) +
     geom_point(size = 3L, colour = "#0c4c8a") +
-    xlab(bquote("Standardized Dissolved "*N[2]*"O")) +
+    xlab(bquote("Standardized Flux "*N[2]*"O")) +
     ylab("Order of the data")+
     theme_bw()+
     theme(axis.title.y = element_text(size = 14),
@@ -227,7 +228,7 @@ boxplot.stats(river_sta$sta_CH4)$out # no outlier
 ggsave("Cleveland_CH4.tiff",ggplot(river_sta) +
     aes(x = sta_CH4, y = No) +
     geom_point(size = 3L, colour = "#0c4c8a") +
-    xlab(bquote("Standardized Dissolved "*CH[4]*"")) +
+    xlab(bquote("Standardized Flux "*CH[4]*"")) +
     ylab("Order of the data")+
     theme_bw()+
     theme(axis.title.y = element_text(size = 14),
@@ -280,7 +281,7 @@ river_sta_CO2 <- river_sta %>% filter (sta_CO2 < 1.3)
 ggsave("Cleveland_CO2.tiff",ggplot(river_sta_CO2) +
            aes(x = sta_CO2, y = No) +
            geom_point(size = 3L, colour = "#0c4c8a") +
-           xlab(bquote("Standardized Dissolved "*CO[2]*"")) +
+           xlab(bquote("Standardized Flux "*CO[2]*"")) +
            ylab("Order of the data")+
            theme_bw()+
            theme(axis.title.y = element_text(size = 14),
@@ -340,7 +341,7 @@ write_csv(river_dun_D, "river_dun_D.csv")
 
 #*** Friedmann test ####
 
-river_fried <- river %>% select(c(2,5, 36:38))
+river_fried <- river %>% select(c(2, 5, 36:38))
 river_fried_1 <- aggregate(data = river_fried, .~Date + River, mean)
 river_fried_2 <- aggregate(list(river_fried[,3:5]), by = list(Date = river_fried$Date,
                                                                   River = river_fried$River), FUN = mean)
@@ -740,7 +741,7 @@ ggsave("RF_N2O_2_opt_per.tiff", ggplot(featureImportance_N2O_2_opt_per[,], aes(x
            theme_bw(base_size=20) +
            scale_x_discrete(labels = labels_N2O_2_per_parse) +
            labs(x = NULL, y = "Scale Importance") + 
-           ggtitle(bquote(""~N[2]~"O")) +
+           ggtitle(bquote(""~N[2]*"O")) +
            theme(plot.title=element_text(size=18)),
        units = 'cm', height = 20, width = 20, dpi = 300)
 
@@ -907,3 +908,117 @@ ggsave("RF_CO2_2_opt_per.tiff", ggplot(featureImportance_CO2_2_opt_per[,], aes(x
            ggtitle(bquote("CO"[2])) +
            theme(plot.title=element_text(size=18)),
        units = 'cm', height = 20, width = 20, dpi = 300)
+
+#### REVISION NOTES ########
+#### Dissolved gas concentration_CO2 ####
+
+river2 <- read_csv("River2.csv")
+river2$log_CO2 <- log(river2$Dis_CO2_cor)
+river2$sta_CO2 <- standardize(river_sta$log_CO2) 
+river_RF_2$CO2 <- river2$sta_CO2
+
+
+trainTask_CO2_2 <- createDummyFeatures(river_RF_2 %>% select(-N2O,-CH4),target = "CO2")
+trainTask_CO2_2 <- makeRegrTask(data = river_RF_2 %>% select(-N2O,-CH4),target = "CO2")
+
+# create mlr learner
+set.seed(1234)
+lrn_CO2_2 <- makeLearner("regr.ranger")
+# lrn_CO2_2$par.vals <- list(ntree = 100L, importance = TRUE)
+cv_CO2_2 <- makeResampleDesc(method = "LOO")
+# set parallel backend
+parallelStartSocket(cpus = detectCores()-1)
+res_CO2_2 <- resample(learner = lrn_CO2_2, task = trainTask_CO2_2, resampling = cv_CO2_2)
+# Tuning hyperparameters
+
+# Only tune three abovementioned hyperparameters
+
+params_CO2_2 <- makeParamSet(makeIntegerParam("mtry", lower = 2, upper = 10),
+                             makeIntegerParam("min.node.size", lower = 2, upper = 25))
+tc_CO2_2 <- makeTuneControlMBO(budget = 100)
+tr_CO2_2 <- tuneParams(learner = lrn_CO2_2, task = trainTask_CO2_2, resampling = cv_CO2_2,
+                       par.set = params_CO2_2, control = tc_CO2_2, show.info = F)
+
+parallelStop()
+tr_CO2_2
+# Tune result:
+# mtry=10; min.node.size=2
+# mse.test.mean=0.221592
+
+# Apply the optimal RF
+
+# using ranger package with permutation feature importance
+set.seed(1234)
+regressor_CO2_2_opt_ranger <- ranger(formula = CO2~., data = river_RF_2[,-c(22,23)], num.trees =  1000, mtry = 10, 
+                                     importance = 'permutation', min.node.size = 2) 
+imp_CO2_2_opt_per <- importance_pvalues(x = regressor_CO2_2_opt_ranger, method = 'janitza', num.permutations = 100)
+
+featureImportance_CO2_2_opt_per <- data.frame(Feature=row.names(imp_CO2_2_opt_per), Importance=imp_CO2_2_opt_per[,1], 
+                                              pvalue=imp_CO2_2_opt_per[,2])
+# remove the variables with pvalue >0.05
+featureImportance_CO2_2_opt_per <- featureImportance_CO2_2_opt_per %>% filter(pvalue <=0.05)
+
+labels_CO2_2_per <- c("DO", "NH[4]^+{}",  "Water ~ temperature",  "PO[4]^3^-{}", "pH ", "NO[2]^-{}", "Average ~ depth", "NO[3]^-{}", 
+                      "Average ~ velocity", "Turbidity",  "Pool~class", "Chlorophyll*~alpha")
+labels_CO2_2_per <- rev(labels_CO2_2_per)
+labels_CO2_2_per_parse <- parse(text = labels_CO2_2_per)
+
+ggsave("Dissolved_gas_RF.jpeg", ggplot(featureImportance_CO2_2_opt_per[,], aes(x=reorder(Feature, Importance), y=Importance)) +
+           geom_bar(stat="identity", fill="tomato") +
+           coord_flip() + 
+           theme_bw(base_size=20) +
+           scale_x_discrete(labels = labels_CO2_2_per_parse) +
+           labs(x = NULL, y = "Scale Importance") + 
+           ggtitle(bquote("CO"[2])) +
+           theme(plot.title=element_text(size=18)),
+       units = 'cm', height = 20, width = 20, dpi = 300)
+
+#### Dissolved gas concentration_mixed model #####
+river_sta$sta_CO2 <- river2$sta_CO2
+
+boxplot.stats(river_sta$sta_CO2)$out
+river_sta_CO2 <- river_sta %>% filter (sta_CO2 < 1.3)
+
+# using cleveland dotplot
+
+ggsave("Dissolved_gas_Cleveland_CO2.jpg",ggplot(river_sta_CO2) +
+           aes(x = sta_CO2, y = No) +
+           geom_point(size = 3L, colour = "#0c4c8a") +
+           xlab(bquote("Standardized Flux "*CO[2]*"")) +
+           ylab("Order of the data")+
+           theme_bw()+
+           theme(axis.title.y = element_text(size = 14),
+                 axis.title.x = element_text(size = 14),
+                 text = element_text(size = 14)),
+       units = 'cm', height = 20, width = 20, dpi = 300)
+
+
+# mixed model
+
+set.seed(1)
+
+river_lmm_CO2 <- lmer(sta_CO2~1 + (1|River/Date), data = river_sta)
+r.squaredGLMM(river_lmm_CO2)
+summary(river_lmm_CO2)
+vcov(river_lmm_CO2)
+var_CO2 <- as.data.frame(VarCorr(river_lmm_CO2))
+# using built-in function
+river_lmm_CO2_fort <- fortify(river_lmm_CO2)
+
+
+diagPlts <- diagPlot(river_lmm_CO2)
+ggsave("CO2_Diagnostic_plot1.jpg",diagPlts[[1]],
+       units = 'cm', height = 20, width = 20, dpi = 300)
+ggsave("CO2_Diagnostic_plot2.jpg",diagPlts[[2]],
+       units = 'cm', height = 20, width = 20, dpi = 300)
+ggsave("CO2_Diagnostic_plot3.jpg",diagPlts[[3]],
+       units = 'cm', height = 20, width = 20, dpi = 300)
+
+# ICC values 
+ICC_date_CO2 <- var_CO2$vcov[1]/sum(var_CO2$vcov)
+ICC_river_CO2 <- (var_CO2$vcov[1] + var_CO2$vcov[2])/sum(var_CO2$vcov)
+
+
+# ICC river and date are low meaning low spatiotemporal variability
+
+# As such, can applied Kruskal-Wallis
